@@ -10,7 +10,7 @@ export class PaymentsService {
   private readonly stripe = new Stripe(envs.stripeSecret);
 
   async createPaymentSession(paymentSessionDto: PaymentSessionDto) {
-    const { currency, items } = paymentSessionDto;
+    const { currency, items, orderId } = paymentSessionDto;
 
     const lineItems = items.map((item) => {
       return{
@@ -28,7 +28,9 @@ export class PaymentsService {
     const session = await this.stripe.checkout.sessions.create({
       // Colocar aquí el ID de mi Orden
       payment_intent_data: {
-        metadata: {},
+        metadata: {
+          orderId: orderId
+        },
       },
 
       line_items:lineItems,
@@ -52,7 +54,12 @@ export class PaymentsService {
     console.log({event});
     switch (event.type) {
       case 'charge.succeeded':
-        console.log('Payment was successful!');
+        const chargeSucceeeded = event.data.object;
+        //console.log('Payment was successful!');
+        console.log({
+          metadata: chargeSucceeeded.metadata,
+          orderId: chargeSucceeeded.metadata.orderId,
+        })
         break;
 
         default:
