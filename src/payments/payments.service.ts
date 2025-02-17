@@ -3,7 +3,6 @@ import { envs } from 'src/config';
 import Stripe from 'stripe';
 import { PaymentSessionDto } from './dto/payment-sesion.dto';
 import e, { Request, Response } from 'express';
-import { request } from 'http';
 
 @Injectable()
 export class PaymentsService {
@@ -13,58 +12,61 @@ export class PaymentsService {
     const { currency, items, orderId } = paymentSessionDto;
 
     const lineItems = items.map((item) => {
-      return{
-        price_data:{
+      return {
+        price_data: {
           currency: currency,
-          product_data:{
-            name: item.name
+          product_data: {
+            name: item.name,
           },
-          unit_amount: Math.round(item.price *100)
+          unit_amount: Math.round(item.price * 100),
         },
-        quantity: item.quantity
-      }
+        quantity: item.quantity,
+      };
     });
 
     const session = await this.stripe.checkout.sessions.create({
       // Colocar aquí el ID de mi Orden
       payment_intent_data: {
         metadata: {
-          orderId: orderId
+          orderId: orderId,
         },
       },
 
-      line_items:lineItems,
+      line_items: lineItems,
       mode: 'payment',
-      success_url: 'http://localhost:3003/payments/success',
-      cancel_url: 'http://localhost:3003/payments/cancel',
+      success_url: envs.stripeSuccessUrl,
+      cancel_url: envs.stripeCancelUrl,
     });
     return session;
   }
 
-  async stripeWebhook(req: Request, res: Response){
+  async stripeWebhook(req: Request, res: Response) {
     const sig = req.headers['stripe-signature'];
     let event: Stripe.Event;
-    const endpointSecret = "whsec_vrP5ANy2HJ0Aq1P9N3C7YmkEPXpkmi59";
+    const endpointSecret = envs.stripeEndpointSecret;
     try {
-      event = this.stripe.webhooks.constructEvent(req['rawBody'],sig,endpointSecret);
+      event = this.stripe.webhooks.constructEvent(
+        req['rawBody'],
+        sig,
+        endpointSecret,
+      );
     } catch (err) {
-      res.status(400).send(`Webhook Error: ${err.message}`); 
+      res.status(400).send(`Webhook Error: ${err.message}`);
       return;
     }
-    console.log({event});
+    console.log({ event });
     switch (event.type) {
       case 'charge.succeeded':
         const chargeSucceeeded = event.data.object;
-        //console.log('Payment was successful!');
         console.log({
           metadata: chargeSucceeeded.metadata,
           orderId: chargeSucceeeded.metadata.orderId,
-        })
+        });
         break;
 
-        default:
-          console.log(`Unhandled event type ${event.type}`);
+      default:
+        console.log(`Unhandled event type ${event.type}`);
     }
-    return res.status(200).json({sig})
+    return res.status(200).json({ sig });
   }
 }
